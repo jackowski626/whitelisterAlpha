@@ -1,0 +1,2 @@
+# whitelisterAlpha
+"Alpha" test repo for the Whitelister bot. It contains a file with used functions from the python module "mcuuid" which was fixed. Without the fix (fresh installation with pip) it returns this error: ```    from mcuuid.api import GetPlayerData   File "C:\Users\jacek\.conda\envs\Discord\lib\site-packages\mcuuid\api.py", line 10, in &lt;module>     from tools import is_valid_minecraft_username ModuleNotFoundError: No module named 'tools'```.  The author fixed the issue on GitHub but hasn't fiexed the pip install yet: https://github.com/clerie/mcuuid/issues/1
