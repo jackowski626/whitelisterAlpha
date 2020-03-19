@@ -1,0 +1,65 @@
+{
+    "token": "-",
+    "servers": {
+        "123456789": {
+            "server_id": 123456789,
+            "prefix": ".",
+            "hasPosted": "True",
+            "DEMANDER_CHANNEL": 123456789,
+            "EN_SUSPENS_CHANNEL": 123456789,
+            "MESSAGE_DE_DEMANDE_ID": 123456789,
+            "CHANNEL_DES_MSGS_REFUSES": 123456789,
+            "DERNIER_MESSAGE_COMMANDE_DEMANDE_REFUSEE": 123456789,
+            "DERNIER_MESSAGE_DE_REFUS_DE_COMMANDE_DU_BOT": 123456789,
+            "privileged_roles": [
+                123456789,
+                123456789
+            ],
+            "minecraftFTP": {
+                "host": "example.net",
+                "user": "johnSmith",
+                "password": "strongPassword",
+                "path": "/htdocs/whitelist_test/minecraft"
+            },
+            "usersWaitingForNicknameConfirmation": [],
+            "hasRespondedWithValidUname": [],
+            "hasRespondedWithValidUnameDict": {},
+            "whitelistedUsers": [
+                "jackowski626#123456789"
+            ],
+            "discordToMCdict": {
+                "123456789": {
+                    "DiscordTag": "jackowski626#123456789",
+                    "username": "jackowski",
+                    "uuid": "7dde9977-07e0-47d4-bab9-be4b47f153a9"
+                }
+            }
+        },
+        "689727812222976006": {
+            "server_id": 123456789,
+            "prefix": "!",
+            "hasPosted": "True",
+            "DEMANDER_CHANNEL": 123456789,
+            "EN_SUSPENS_CHANNEL": 123456789,
+            "MESSAGE_DE_DEMANDE_ID": 123456789,
+            "CHANNEL_DES_MSGS_REFUSES": 123456789,
+            "DERNIER_MESSAGE_COMMANDE_DEMANDE_REFUSEE": 123456789,
+            "DERNIER_MESSAGE_DE_REFUS_DE_COMMANDE_DU_BOT": 123456789,
+            "privileged_roles": [
+                123456789,
+                123456789
+            ],
+            "minecraftFTP": {
+                "host": "example2.net",
+                "user": "none",
+                "password": "none",
+                "path": "none"
+            },
+            "usersWaitingForNicknameConfirmation": [],
+            "hasRespondedWithValidUname": [],
+            "hasRespondedWithValidUnameDict": {},
+            "whitelistedUsers": [],
+            "discordToMCdict": {}
+        }
+    }
+}
