@@ -1,4 +1,4 @@
-#BOT invite link: https://discordapp.com/api/oauth2/authorize?client_id=689044268584796177&permissions=8&scope=bot
+#BOT invite link: https://discordapp.com/api/oauth2/authorize?client_id=689044268584796177&permissions=537918672&scope=bot
 import discord
 from discord.ext import commands
 import json
@@ -10,7 +10,8 @@ from ftplib import FTP
 import os
 import http.client
 import random
-from fixedMcuuidAPI import GetPlayerData 
+import paramiko
+from fixedMcuuidAPI import GetPlayerData
 import variables
 
 #----------------------------------------------------
@@ -79,18 +80,30 @@ def grabUuids(name, guild_id):
     if len(noneCredentialsList) > 0:
         return ["missingCredentials", noneCredentialsList]
     if DEBUG: print("Connecting to ftp with:",minecraftFTP["user"],minecraftFTP["password"],minecraftFTP["path"])
-    ftp = FTP(minecraftFTP["host"])
-    try:
-        ftp.login(user = minecraftFTP["user"], passwd = minecraftFTP["password"])
-        ftp.cwd(minecraftFTP["path"])
-        filename = name
-        localfile = open(filename, 'wb')
-        ftp.retrbinary('RETR ' + filename, localfile.write, 1024)
-        ftp.quit()
-        localfile.close()
-        return ["ok"]
-    except ftplib.error_perm:
-        return ["error"]
+    if minecraftFTP["mode"] == "ftp":
+        ftp = FTP(minecraftFTP["host"])
+        try:
+            ftp.login(user = minecraftFTP["user"], passwd = minecraftFTP["password"])
+            ftp.cwd(minecraftFTP["path"])
+            filename = name
+            localfile = open(filename, 'wb')
+            ftp.retrbinary('RETR ' + filename, localfile.write, 1024)
+            ftp.quit()
+            localfile.close()
+            return ["ok"]
+        except ftplib.error_perm:
+            return ["error"]
+    elif minecraftFTP["mode"] == "sftp":
+        host, port = minecraftFTP["host"], minecraftFTP["port"]
+        transport = paramiko.Transport((host,port))
+        sftp = paramiko.SFTPClient.from_transport(transport)
+        filepath = ""
+        if minecraftFTP["path"][-1] == "/":
+            filepath = minecraftFTP["path"]+WHITELIST_FILENAME
+        else:
+            filepath = minecraftFTP["path"]+"/"+WHITELIST_FILENAME
+        localpath = "./"+WHITELIST_FILENAME
+        sftp.get(filepath, localpath)
 
 #Function that sends the whitelist JSON file to a remote FTP location. Ii uses configurable credentials and connects to an FTP server with Minecraft server files, usually
 def placeUuids(name, guild_id):
@@ -100,17 +113,29 @@ def placeUuids(name, guild_id):
     with open(DB_FILENAME) as json_file:
         data = json.load(json_file)
         minecraftFTP = data["servers"][str(guild_id)]["minecraftFTP"]
-    ftp = FTP(minecraftFTP["host"])
-    try:
-        ftp.login(user = minecraftFTP["user"], passwd = minecraftFTP["password"])
-        ftp.cwd(minecraftFTP["path"])
-        filename = name
-        ftp.storbinary('STOR '+filename, open(filename, 'rb'))
-        ftp.quit()
-    except ftplib.error_perm:
-        with open(DB_FILENAME) as json_file:
-            data = json.load(json_file)
-            bot.get_channel(data["servers"][str(guild_id)]).send("Erreur de permissions FTP. Les identifiants FTP du serveur Minecraft sont probablement non-valides.")
+    if minecraftFTP["mode"] == "ftp":
+        ftp = FTP(minecraftFTP["host"])
+        try:
+            ftp.login(user = minecraftFTP["user"], passwd = minecraftFTP["password"])
+            ftp.cwd(minecraftFTP["path"])
+            filename = name
+            ftp.storbinary('STOR '+filename, open(filename, 'rb'))
+            ftp.quit()
+        except ftplib.error_perm:
+            with open(DB_FILENAME) as json_file:
+                data = json.load(json_file)
+                bot.get_channel(data["servers"][str(guild_id)]).send("Erreur de permissions FTP. Les identifiants FTP du serveur Minecraft sont probablement non-valides.")
+    elif minecraftFTP["mode"] == "sftp":
+        host, port = minecraftFTP["host"], minecraftFTP["port"]
+        transport = paramiko.Transport((host,port))
+        sftp = paramiko.SFTPClient.from_transport(transport)
+        filepath = ""
+        if minecraftFTP["path"][-1] == "/":
+            filepath = minecraftFTP["path"]+WHITELIST_FILENAME
+        else:
+            filepath = minecraftFTP["path"]+"/"+WHITELIST_FILENAME
+        localpath = "./"+WHITELIST_FILENAME
+        sftp.get(localpath, filepath)
 
 #Function that writes from variable to file on the disk. It is called writeJSON because for now, each use of it writes to a JSON file.
 def writeJSON(data, json_file):
@@ -147,6 +172,8 @@ if DEBUG: print("bot properties: "+pp.pformat(bot.command_prefix))
 
 #Function that returns T/F depending if the user that issued the ctx has a role that is in the list of roles with privileges. In the JSON file, this entry is "privileged_roles"
 def hasPerms(ctx):
+    if ctx.author == ctx.guild.owner:
+        return True
     grabDB(DB_FILENAME)
     with open(DB_FILENAME) as json_file:
         data = json.load(json_file)
@@ -295,7 +322,6 @@ async def host(ctx):
                 ctx.user.send("Veuillez répondre avec le nom d'hôte pour le serveur FTP Minecraft du serveur "+ctx.guild.name)
             else:
                 await ctx.channel.send("Vous avez déjà effectué une demande pour cette commande")
-
 #WIP    
 @host.error
 async def info_error(ctx, error):
@@ -303,18 +329,45 @@ async def info_error(ctx, error):
         await ctx.channel.send("Veuillez indiquer un nom d'hôte")
 
 #WIP
-"""@bot.event
+"""@bot.command(pass_context=True)
+async def addPrivileged(ctx):
+    if not isMessageFromDM(ctx) and guildHasThisPrefix(ctx.guild.id, ctx.prefix) and hasPerms(ctx):
+        grabDB(DB_FILENAME)
+        with open(DB_FILENAME, 'r+') as json_file:
+            data = json.load(json_file)
+            for mention in ctx.message.mentions:
+                data["servers"][str(ctx.guild.id)]["privileged_roles"].append(role.id)
+            writeJSON(data, json_file)
+        placeDB(DB_FILENAME)"""
+
+#An event that triggers when the bot is invited to a guild. The bot then pings the first admin role it can find and the owner of the guild in the first available text channel to inform about stuff. It also creates a new dictionnary in the database json for the server
+@bot.event
 async def on_guild_join(guild):
     grabDB(DB_FILENAME)
     with open(DB_FILENAME, 'r+') as json_file:
-        data = json.load(json_file)"""
+        data = json.load(json_file)
+        #Add a new server entry to the json
+        data["servers"][str(guild.id)] = {"server_id":guild.id,"prefix":DEFAULT_PREFIX,"hasPosted":"False","ASK_CHANNEL":"none","WAITING_CHANNEL":"none","ASK_MESSAGE":"none","REFUSED_ASK_COMMAND_CHANNEL":"none","REFUSED_ASK_COMMAND_MESSAGE":"none","REFUSED_BOT_ASK_COMMAND_MESSAGE":"none","privileged_roles":[],"usersWaitingForFtpHostConfirmation":[],"usersWaitingForFtpUserConfirmation":[],"usersWaitingForFtpPasswordConfirmation":[],"usersWaitingForFtpPathConfirmation":[],"minecraftFTP":{"host":"none","user":"none","password":"none","path":"none"},"usersWaitingForNicknameConfirmation":[],"hasRespondedWithValidUname":[],"hasRespondedWithValidUnameDict":{},"whitelistedUsers":[],"discordToMCdict":{}}
+        #Send message which pings a role with admin privileges and says that the bot should be configured
+        validRole = None
+        for role in guild.roles:
+            if role.permissions.administrator:
+                data["servers"][str(guild.id)]["privileged_roles"].append(role.id)
+                validRole = role
+                break
+        if validRole:
+            await guild.text_channels[0].send(guild.owner.mention+" "+role.mention+" Bonjour, je viens d'arriver sur le serveur. Avant de pouvoir whitelister les membres de ce serveur, je devrai être configuré. Le rôle mentionné a été automatiquement ajouté aux rôles permettant d'exécuter les commandes administratives du bot, ainsi que whitelister les membres. Utilisez la commande _!addPrivileged_ ou _!removePrivileged_ pour ajouter ou supprimer des rôles de la liste des rôles privilégiés. Pour vous renseigner d'avantage sur ma configuration, exécutez la commande _!config_")
+        else:
+            await guild.text_channels[0].send(guild.owner.mention+" Bonjour, je viens d'arriver sur le serveur. Avant de pouvoir whitelister les membres de ce serveur, je devrai être configuré. Utilisez la commande _!addPrivileged_ ou _!removePrivileged_ pour ajouter ou supprimer des rôles de la liste des rôles privilégiés, ceux-ci pourront configurer le bot et ajouter ou supprimer des utilisateurs de la whitelist. Pour vous renseigner d'avantage sur ma configuration, exécutez la commande _!config_")
+                #ping the owner
+        writeJSON(data, json_file)
+    placeDB(DB_FILENAME)
 
 #Bot logs into console when ready
 @bot.event
 async def on_ready():
     if DEBUG: print(f'{bot.user} shall serve his master!'); return
     print(f'{bot.user} shall serve his master!')
-
 
 #Event that is triggered each time a reaction is added in a guild or private messages it can access
 @bot.event
@@ -461,7 +514,7 @@ async def on_raw_reaction_add(reaction):
 async def on_message(message):
     if message.author == bot.user:
         return
-    if isMessageFromDM(CustomCtx(mesage.guild, message.author)):
+    if isMessageFromDM(CustomCtx(message.guild, message.author)):
         fullUsername = message.author.name+"#"+message.author.discriminator
         #Check if username not alrady in usersWaitingForNicknameConfirmation
         grabDB(DB_FILENAME)
