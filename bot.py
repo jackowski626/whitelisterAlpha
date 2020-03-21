@@ -239,8 +239,11 @@ async def whitelist(ctx):
                         if data["servers"][str(ctx.guild.id)]["discordToMCdict"][key]["username"] == whitelist[i]["name"]:
                             if DEBUG: print(pp.pformat(key))
                             memberList.append(bot.get_user(int(key)).name)
-        joinSeparator = ", "
-        await ctx.channel.send("Liste de membres dans la whitelist: "+joinSeparator.join(memberList))
+        if len(memberList) > 0:
+            joinSeparator = ", "
+            await ctx.channel.send("Liste de membres dans la whitelist: "+joinSeparator.join(memberList))
+        else:
+            await ctx.channel.send("Il n'y pas de membres dans la whitelist")
 
 #Command which sends a message cntaining information on how to change FTP credentials
 @bot.command(pass_context=True)
@@ -328,17 +331,42 @@ async def info_error(ctx, error):
     if isinstance(error, commands.errors.MissingRequiredArgument):
         await ctx.channel.send("Veuillez indiquer un nom d'hôte")
 
-#WIP
-"""@bot.command(pass_context=True)
-async def addPrivileged(ctx):
+#Command used to add roles to the privileged_roles list
+@bot.command(pass_context=True)
+async def addPrivileged(ctx, *, message):
     if not isMessageFromDM(ctx) and guildHasThisPrefix(ctx.guild.id, ctx.prefix) and hasPerms(ctx):
         grabDB(DB_FILENAME)
         with open(DB_FILENAME, 'r+') as json_file:
             data = json.load(json_file)
-            for mention in ctx.message.mentions:
-                data["servers"][str(ctx.guild.id)]["privileged_roles"].append(role.id)
+            print("message "+message)
+            for role in ctx.guild.roles:
+                #print("hmm role")
+                print("mention "+role.mention)
+                if role.mention in message:
+                    data["servers"][str(ctx.guild.id)]["privileged_roles"].append(role.id)
             writeJSON(data, json_file)
-        placeDB(DB_FILENAME)"""
+        placeDB(DB_FILENAME)
+@addPrivileged.error
+async def info_error(ctx, error):
+    if isinstance(error, commands.errors.MissingRequiredArgument):
+        pass
+
+#Command used to remove roles from the privileged_roles list
+@bot.command(pass_context=True)
+async def removePrivileged(ctx, *, message):
+    if not isMessageFromDM(ctx) and guildHasThisPrefix(ctx.guild.id, ctx.prefix) and hasPerms(ctx):
+        grabDB(DB_FILENAME)
+        with open(DB_FILENAME, 'r+') as json_file:
+            data = json.load(json_file)
+            for role in ctx.guild.roles:
+                if role.mention in message and role.id in data["servers"][str(ctx.guild.id)]["privileged_roles"]:
+                    data["servers"][str(ctx.guild.id)]["privileged_roles"].remove(role.id)
+            writeJSON(data, json_file)
+        placeDB(DB_FILENAME)
+@removePrivileged.error
+async def info_error(ctx, error):
+    if isinstance(error, commands.errors.MissingRequiredArgument):
+        pass
 
 #An event that triggers when the bot is invited to a guild. The bot then pings the first admin role it can find and the owner of the guild in the first available text channel to inform about stuff. It also creates a new dictionnary in the database json for the server
 @bot.event
@@ -367,7 +395,7 @@ async def on_guild_join(guild):
 @bot.event
 async def on_ready():
     if DEBUG: print(f'{bot.user} shall serve his master!'); return
-    print(f'{bot.user} shall serve his master!')
+    print(f'{bot.user} has connected to Discord!')
 
 #Event that is triggered each time a reaction is added in a guild or private messages it can access
 @bot.event
