@@ -12,9 +12,10 @@ import http.client
 import random
 from fixedMcuuidAPI import GetPlayerData 
 
+debug = False
 
 pp = pprint.PrettyPrinter(indent=4)
-TOKEN = "******************************"
+TOKEN = "Njg5MDQ0MjY4NTg0Nzk2MTc3.XnHDHQ.DXkV6IuB7VKKuhtOg09xSC4es2Y"
 db_filename = "alphadb.json"
 default_prefix = "!"
 
@@ -25,6 +26,7 @@ class CustomCtx:
     self.author = user
 
 def grabDB(name):
+    if debug: print("grabDB("+name+")")
     ftp = FTP('ftpupload.net')
     ftp.login(user = 'epiz_24969303', passwd = 'W4qR0HzfL5GK3')
     ftp.cwd('/htdocs/whitelist_test')
@@ -34,6 +36,7 @@ def grabDB(name):
     ftp.quit()
     localfile.close()
 def placeDB(name):
+    if debug: print("placeDB("+name+")")
     ftp = FTP('ftpupload.net')
     ftp.login(user = 'epiz_24969303', passwd = 'W4qR0HzfL5GK3')
     ftp.cwd('/htdocs/whitelist_test')
@@ -41,6 +44,7 @@ def placeDB(name):
     ftp.storbinary('STOR '+filename, open(filename, 'rb'))
     ftp.quit()
 def grabUuids(name, guild_id):
+    if debug: print("grabUuids("+name+", "+str(guild_id)+")")
     minecraftFTP = {}
     grabDB(db_filename)
     with open(db_filename) as json_file:
@@ -52,7 +56,7 @@ def grabUuids(name, guild_id):
             noneCredentialsList.append(detail)
     if len(noneCredentialsList) > 0:
         return ["missingCredentials", noneCredentialsList]
-    print(minecraftFTP["user"],minecraftFTP["password"],minecraftFTP["path"])
+    if debug: print("Connecting to ftp with:",minecraftFTP["user"],minecraftFTP["password"],minecraftFTP["path"])
     ftp = FTP(minecraftFTP["host"])
     try:
         ftp.login(user = minecraftFTP["user"], passwd = minecraftFTP["password"])
@@ -70,6 +74,7 @@ def grabUuids(name, guild_id):
             await bot.get_channel(data["servers"][str(guild_id)]["EN_SUSPENS_CHANNEL"]).send("Erreur de permissions FTP. Les identifiants FTP du serveur Minecraft sont probablement non-valides.")"""
     
 def placeUuids(name, guild_id):
+    if debug: print("placeUuids("+name+", "+str(guild_id)+")")
     minecraftFTP = {}
     grabDB(db_filename)
     with open(db_filename) as json_file:
@@ -88,6 +93,7 @@ def placeUuids(name, guild_id):
             bot.get_channel(data["servers"][str(guild_id)]).send("Erreur de permissions FTP. Les identifiants FTP du serveur Minecraft sont probablement non-valides.")
 
 def writeJSON(data, json_file):
+    if debug: print("writingJSON("+pp.pformat(data)+", "+pp.pformat(json_file)+")")
     json_file.seek(0)
     json.dump(data, json_file, indent=4)
     json_file.truncate()
@@ -130,6 +136,11 @@ def getServerFromPrefix(prefix):
             if data["servers"][server]["prefix"] == prefix:
                 return int(server)
 
+def isMessageFromDM(ctx):
+    if ctx.guild is None:
+        return True
+    return False
+
 def commandFromGoodServer(ctx):
     if ctx.guild.id == getServerFromPrefix(ctx.prefix):
         return True
@@ -141,18 +152,125 @@ def toBool(val):
         return True
     return False
 
+"""def userHasPendingCommands(user_id):
+    grabDB(db_filename)
+    with open(db_filename) as json_file:
+        data = json.load(json_file)
+        ds = data["servers"]
+        for s in ds:
+            if user_id in ds[s]["usersWaitingForFtpHostConfirmation"] or user_id in ds[s]["usersWaitingForFtpUserConfirmation"] or user_id in ds[s]["usersWaitingForFtpHostConfirmation"] or user_id in ds[s]["usersWaitingForFtpHostConfirmation"] //lastPoint"""
+
 @bot.command(name="s")
 async def on_message(ctx):
-    if commandFromGoodServer(ctx) and hasPerms(ctx):
+    if not isMessageFromDM(ctx) and commandFromGoodServer(ctx) and hasPerms(ctx):
         await ctx.send(random.choice(["Arrivederci", "Goodnight girl, I'll see you tomorrow", "last seen online: 6 years ago", "stop! you can't ju"]))
         await bot.logout()
 
 @bot.command(pass_context=True)
+async def w(ctx):
+    if not isMessageFromDM(ctx) and commandFromGoodServer(ctx) and hasPerms(ctx):
+        #responseString = "Liste de membres dans la whitelist: "
+        memberList = []
+        grabUuids("whitelist.json", ctx.guild.id)
+        grabDB(db_filename)
+        with open("whitelist.json") as whitelist_file:
+            whitelist = json.load(whitelist_file)
+            for i in range(len(whitelist)):
+                with open(db_filename) as json_file:
+                    data = json.load(json_file)
+                    #print("jpp "+pp.pformat(data))
+                    for key in data["servers"][str(ctx.guild.id)]["discordToMCdict"]:
+                        print("name: "+whitelist[i]["name"])
+                        if data["servers"][str(ctx.guild.id)]["discordToMCdict"][key]["username"] == whitelist[i]["name"]:
+                            print(pp.pformat(key))
+                            memberList.append(bot.get_user(int(key)).name)
+                    #memberList.append(data["servers"][str(ctx.guild.id)]["discordToMCdict"])
+        joinSeparator = ", "
+        await ctx.channel.send("Liste de membres dans la whitelist: "+joinSeparator.join(memberList))
+
+@bot.command(pass_context=True)
 async def ftp(ctx):
-    if commandFromGoodServer(ctx):
+    if not isMessageFromDM(ctx) and commandFromGoodServer(ctx):
         await ctx.channel.send("Pour changer le hôte FTP pour le serveur Minecraft, le nom d'utilisateur, le mot de passe et le chemin d'accès, utilisez ces commandes respectives: _host_, _user_, _password_, _path_.\nExemple d'utilisation: ```"+ctx.prefix+"path /htdocs/whitelist_test/minecraft```")
 
 @bot.command(pass_context=True)
+async def removeFromWhitelist(ctx):
+    if not isMessageFromDM(ctx) and commandFromGoodServer(ctx) and hasPerms(ctx):
+        if len(ctx.message.mentions) == 0:
+            await ctx.channel.send("Vous devez taguer au moins un utilisateur")
+            return
+        server = str(ctx.guild.id)
+        grabDB(db_filename)
+        with open(db_filename, 'r+') as json_file:
+            data = json.load(json_file)
+            messageDeDemande = await bot.get_channel(data["servers"][server]["DEMANDER_CHANNEL"]).fetch_message(data["servers"][server]["MESSAGE_DE_DEMANDE_ID"])
+            for mention in ctx.message.mentions:
+                user = bot.get_user(mention.id)
+                userTag = user.name+"#"+user.discriminator
+                userRemovedFrom = []
+                for reaction in messageDeDemande.reactions:
+                    #print("reaction users attributes: "+pp.pformat(dir(reaction.users)))
+                    #print("reaction users hmm: "+pp.pformat(reaction.users()))
+                    if str(reaction.emoji) == "✅":
+                        reactors = await reaction.users().flatten()
+                        for i in range(len(reactors)):
+                            if debug: print("reactors['key'].id: "+pp.pformat(reactors[i].id))
+                            if user.id == reactors[i].id:
+                                await messageDeDemande.remove_reaction("✅", user)
+                if userTag in data["servers"][server]["whitelistedUsers"]:
+                    data["servers"][server]["whitelistedUsers"].remove(userTag)
+                    userRemovedFrom = 1
+                if str(user.id) in data["servers"][server]["discordToMCdict"]:
+                    grabUuids("whitelist.json", server)
+                    with open("whitelist.json", 'r+') as json_whitelist:
+                        whitelist = json.load(json_whitelist)
+                        toRemove = {"uuid":data["servers"][server]["discordToMCdict"][str(user.id)]["uuid"], "name":data["servers"][server]["discordToMCdict"][str(user.id)]["username"]}
+                        if toRemove in whitelist:
+                            whitelist.remove(toRemove)
+                            writeJSON(whitelist, json_whitelist)
+                            placeUuids("whitelist.json", ctx.guild.id)
+                            del data["servers"][server]["discordToMCdict"][str(user.id)]
+                            await ctx.channel.send("L'utilisateur a été supprimé de la whitelist")
+                        else:
+                            if str(user.id) in data["servers"][server]["discordToMCdict"]:
+                                del data["servers"][server]["discordToMCdict"][str(user.id)]
+                                userRemovedFrom = 1
+                            if userRemovedFrom:
+                                await ctx.channel.send("L'utilisateur "+user.name+" n'est pas présent dans la whitelist, mais des éléments liés à lui dans la base de données ont été supprimées")
+                            else:
+                                await ctx.channel.send("L'utilisateur "+user.name+" n'est pas présent dans la whitelist")
+                else:
+                    await ctx.channel.send("L'utilisateur "+user.name+" n'est pas présent dans la whitelist")
+            writeJSON(data, json_file)
+    placeDB(db_filename)
+"""@bot.command(pass_context=True)
+
+async def host(ctx,*,message):
+    if not isMessageFromDM(ctx) and commandFromGoodServer(ctx) and hasPerms(ctx):
+        grabDB(db_filename)
+        with open(db_filename, 'r+') as json_file:
+            data = json.load(json_file)
+            data["servers"][str(ctx.guild.id)]["minecraftFTP"]["host"] = message
+            writeJSON(data, json_file)
+        placeDB(db_filename)"""
+
+@bot.command(pass_context=True)
+async def host(ctx):
+    if not isMessageFromDM(ctx) and commandFromGoodServer(ctx) and hasPerms(ctx):
+        grabDB(db_filename)
+        with open(db_filename, 'r+') as json_file:
+            data = json.load(json_file)
+            if ctx.author.id not in data["servers"][str(ctx.guild.id)]["usersWaitingForFtpHostConfirmation"]:
+                data["servers"][str(ctx.guild.id)]["usersWaitingForFtpHostConfirmation"].append(ctx.author.id)
+                writeJSON(data, json_file)
+                placeDB(db_filename)
+                ctx.user.send("Veuillez répondre avec le nom d'hôte pour le serveur FTP Minecraft du serveur "+ctx.guild.name)
+            else:
+                await ctx.channel.send("Vous avez déjà effectué une demande pour cette commande")
+
+
+
+"""@bot.command(pass_context=True)
 async def host(ctx,*,message):
     if commandFromGoodServer(ctx) and hasPerms(ctx):
         grabDB(db_filename)
@@ -160,7 +278,7 @@ async def host(ctx,*,message):
             data = json.load(json_file)
             data["servers"][str(ctx.guild.id)]["minecraftFTP"]["host"] = message
             writeJSON(data, json_file)
-        placeDB(db_filename)
+        placeDB(db_filename)"""
     
 @host.error
 async def info_error(ctx, error):
@@ -175,12 +293,16 @@ async def on_guild_join(guild):
 
 @bot.event
 async def on_ready():
-    print(f'{bot.user} has connected to Discord!')
+    print(f'{bot.user} shall serve his master!')
 
 
 #handle reactions
 @bot.event
 async def on_raw_reaction_add(reaction):
+    if reaction.user_id == bot.user.id:
+        return
+    if debug: print("on_raw_reaction_add triggered")
+
     user = bot.get_user(reaction.user_id)
     
     #member = bot.get_member(reaction.user_id)
@@ -190,13 +312,23 @@ async def on_raw_reaction_add(reaction):
 
     #pm user if reacts in demandes
     grabDB(db_filename)
-    with open(db_filename) as json_file:
-        data = json.load(json_file)
+    """with open(db_filename) as test:
+        test2 = json.load(test)
+        print("have written JSON, alphadb is: "+pp.pformat(test2))"""
+    with open(db_filename) as json_file2:
+        data2 = json.load(json_file2)
+        data = data2
+        if debug: print("Entering the on_react conditions with this json: "+pp.pformat(data))
         for server in data["servers"]:
-            print(str(reaction.channel_id)+" and "+str(data["servers"][server]["DEMANDER_CHANNEL"]))
-            if reaction.channel_id == data["servers"][server]["DEMANDER_CHANNEL"]:
+            #print("channel id: "+str(reaction.channel_id))
+            #print("hmm data data: "+pp.pformat(data))
+            #print("hmm data servers: "+pp.pformat(data["servers"][server]["DEMANDER_CHANNEL"]))
+            #print("hmm data servers server: "+pp.pformat(data["servers"][server]["DEMANDER_CHANNEL"]))
+            #print("hmm data all: "+pp.pformat(data["servers"][server]["DEMANDER_CHANNEL"]))
+            #print(str(reaction.channel_id)+" and "+str(data["servers"][server]["DEMANDER_CHANNEL"]))
+            if reaction.channel_id == data2["servers"][server]["DEMANDER_CHANNEL"]:
+                if debug: print("le channel de la reaction est DEMANDER_CHANNEL")
                 messagee = await bot.get_channel(data["servers"][server]["DEMANDER_CHANNEL"]).fetch_message(reaction.message_id)
-                print("yessaie")
             #print("channel: "+pp.pformat(reaction))
             #reaction attributes: <RawReactionActionEvent message_id=688538146106900539 user_id=435446721485733908 channel_id=688454404621205584 guild_id=688445594125074501 emoji=<PartialEmoji animated=False name='✅' id=None>>
                 #check if username not alrady in usersWaitingForNicknameConfirmation
@@ -212,8 +344,10 @@ async def on_raw_reaction_add(reaction):
                     await user.send("Vous avez fait une demande de whitelist, veuillez répondre par votre nom d'utilisateur Minecraft exact")
             #demandes en suspens, annuler
             elif reaction.channel_id == data["servers"][server]["EN_SUSPENS_CHANNEL"]:
+                if debug: print("le channel de la reaction est EN_SUSPENS_CHANNEL")
                 messagee = await bot.get_channel(data["servers"][server]["EN_SUSPENS_CHANNEL"]).fetch_message(reaction.message_id)
                 if str(reaction.emoji) == "🚫":
+                    if debug: print("emoji of reaction is 🚫 (the no entry sign)")
                     #await bot.get_channel(EN_SUSPENS_CHANNEL).send("vous avez réagi avec: "+pp.pformat(reaction.emoji))
                     #await bot.get_channel(EN_SUSPENS_CHANNEL).send("reaction.user_id is: "+pp.pformat(reaction.user_id))
                     if user.mention in messagee.content:
@@ -229,20 +363,13 @@ async def on_raw_reaction_add(reaction):
                             writeJSON(data, json_file)
                         placeDB(db_filename)
                         await messagee.delete()
+                        await bot.get_channel(reaction.channel_id).send("L'utilisateur " + bot.get_user(reaction.user_id).name + " a annulé sa demande.")
                     else:
                         await messagee.remove_reaction(reaction.emoji, user)
                 #reject by an admin
                 elif str(reaction.emoji) == "❌":
+                    if debug: print("emoji of reaction is ❌ (the cross)")
                     guild = bot.get_guild(reaction.guild_id)
-                    """memberCanDenyWhitelist = False
-                    for member in guild.members:
-                        for role in member.roles:
-                            if role.id == techicienRoleID or role.id == administrateurRoleID or role.id == ModerateurRoleID:
-                                if member.id == user.id:
-                                    print("Can deny whitelist")
-                                    memberCanDenyWhitelist = True"""
-                    #if memberCanDenyWhitelist:
-                    #customCtx = {"guild":guild, "author":{"id":user.id}}
                     if hasPerms(CustomCtx(guild, user)):
                         for member in guild.members:
                             tempUser = bot.get_user(member.id)
@@ -258,7 +385,7 @@ async def on_raw_reaction_add(reaction):
                                 placeDB(db_filename)
                                 with open(db_filename) as json_file:
                                     data = json.load(json_file)
-                                    await messagee.channel.send(tempUser.mention+", votre demande de whitelist a été rejetée. Veuillez s'addresser aux modérateurs avant de réappliquer. Plusieurs demandes consécutives peuvent mener à un ban.")
+                                    await messagee.channel.send(tempUser.mention+", votre demande de whitelist a été rejetée. Veuillez vous addresser aux modérateurs avant de réappliquer. Plusieurs demandes consécutives peuvent mener à un ban.")
                                     await messagee.delete()
                                     messageDeDemande = await bot.get_channel(data["servers"][server]["DEMANDER_CHANNEL"]).fetch_message(data["servers"][server]["MESSAGE_DE_DEMANDE_ID"])
                                     await messageDeDemande.remove_reaction("✅", tempUser)
@@ -266,6 +393,7 @@ async def on_raw_reaction_add(reaction):
                         await messagee.remove_reaction(reaction.emoji, user)
                     #user attributes: <User id=435446721485733908 name='jackowski626' discriminator='0522' bot=False>
                 elif str(reaction.emoji) == "✅":
+                    if debug: print("emoji of reaction is ✅ (the tick)")
                     guild = bot.get_guild(reaction.guild_id)
                     memberCanAcceptWhitelist = False
                     #customCtx = {"guild":guild, "author":{"id":user.id}}
@@ -300,11 +428,11 @@ async def on_raw_reaction_add(reaction):
                                     await messagee.channel.send(tempUser.mention+", votre demande de whitelist a été acceptée.")
                                     await messagee.delete()
                                 #print("grabbed uuids, whitelist is: "+pp.pformat())
-                                    with open('whitelist.json', 'r+') as json_file:
+                                    with open('whitelist.json', 'r+') as whitelist_file:
                                         #textfile = str()
-                                        data = json.load(json_file)
-                                        data.append({"uuid":uuid,"name": ingameName})
-                                        writeJSON(data, json_file)
+                                        whitelist = json.load(whitelist_file)
+                                        whitelist.append({"uuid":uuid,"name": ingameName})
+                                        writeJSON(whitelist, whitelist_file)
                                     placeUuids("whitelist.json", guild.id)
                         elif grabUuidsResponse[0] == "error":
                             await messagee.remove_reaction(reaction.emoji, user)
@@ -351,7 +479,7 @@ async def on_message(message):
                         with open(db_filename) as json_file:
                             data = json.load(json_file)
                             channel = bot.get_channel(data["servers"][server]["EN_SUSPENS_CHANNEL"])
-                            msg = await channel.send("L'utilisateur "+message.author.mention+" a demandé a être ajouté à la whitelist. Il peut réagir avec :no_entry_sign: pour annuler sa demande. Un admin peut réagir avec :white_check_mark: ou :x: pour accepter ou refuser la demande, respectivement.")
+                            msg = await channel.send("L'utilisateur "+message.author.mention+" a demandé a être ajouté à la whitelist en tant que **"+message.content+"**. Il peut réagir avec :no_entry_sign: pour annuler sa demande. Un admin peut réagir avec :white_check_mark: ou :x: pour accepter ou refuser la demande, respectivement.")
                             await msg.add_reaction("✅")
                             await msg.add_reaction("❌")
                             await msg.add_reaction("🚫")
@@ -375,7 +503,7 @@ async def resetDemandeJson(ctx):
 
 @bot.command()
 async def demande(ctx): #place a demande message in current channel
-    if commandFromGoodServer(ctx) and hasPerms(ctx):
+    if not isMessageFromDM(ctx) and commandFromGoodServer(ctx) and hasPerms(ctx):
         grabDB(db_filename)
         with open(db_filename, 'r+') as json_file:
             data = json.load(json_file)
@@ -396,7 +524,7 @@ async def demande(ctx): #place a demande message in current channel
 
 @bot.command()
 async def demandeOverride(ctx): #place a demande message in current channel
-    if commandFromGoodServer(ctx) and hasPerms(ctx):
+    if not isMessageFromDM(ctx) and commandFromGoodServer(ctx) and hasPerms(ctx):
         grabDB(db_filename)
         with open(db_filename, 'r+') as json_file:
             data = json.load(json_file)
@@ -427,9 +555,9 @@ async def demandeOverride(ctx): #place a demande message in current channel
 
 @bot.command(pass_context=True)
 async def say(ctx):
-    #print("ctx: "+pp.pformat(dir(ctx)))
+    print("ctx: "+pp.pformat(dir(ctx.channel)))
     #print("ctx prefix"+ctx.prefix)
-    if commandFromGoodServer(ctx):
+    if not isMessageFromDM(ctx) and commandFromGoodServer(ctx):
         await ctx.channel.send("hello")
 
 @bot.command(pass_context=True)
@@ -441,7 +569,7 @@ async def prefix(ctx,*,message):
             if role.id == techicienRoleID or role.id == administrateurRoleID or role.id == ModerateurRoleID:
                 if member.id == ctx.author.id:
                     hasPerms = True"""
-    if commandFromGoodServer(ctx) and hasPerms(ctx):
+    if not isMessageFromDM(ctx) and commandFromGoodServer(ctx) and hasPerms(ctx):
         if not " " in message:
             bot.command_prefix = message
             grabDB(db_filename)
