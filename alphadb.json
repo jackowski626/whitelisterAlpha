@@ -79,7 +79,8 @@
                 "host": "none",
                 "user": "none",
                 "password": "none",
-                "path": "none"
+                "path": "none",
+                "port": "none"
             },
             "usersWaitingForNicknameConfirmation": [],
             "hasRespondedWithValidUname": [],
