@@ -3,12 +3,12 @@ import discord
 from discord.ext import commands
 import json
 import pprint
-import types
 import copy
 import os
 import http.client
 import random
 import paramiko
+import logging
 from fixedMcuuidAPI import GetPlayerData
 from variables import *
 from functions import *
@@ -57,12 +57,17 @@ if DEBUG: print("bot properties: "+pp.pformat(bot.command_prefix))
 #Bot logs into console when ready
 @bot.event
 async def on_ready():
-    if DEBUG: print(f'{bot.user} shall serve his master!'); return
+    if DEBUG:print(f'{bot.user} shall serve his master!'); return
     print(f'{bot.user} has connected to Discord!')
 
 #An event that triggers when the bot is invited to a guild. The bot then pings the first admin role it can find and the owner of the guild in the first available text channel to inform about stuff. It also creates a new dictionnary in the database json for the server
 @bot.event
 async def on_guild_join(guild):
+    if DEBUG:
+        for channel in guild.text_channels:
+            print("channel perms: "+pp.pformat(channel.permissions_for(guild.me))) 
+            print("send_messages: "+pp.pformat(channel.permissions_for(guild.me).send_messages))
+
     grabDB(DB_FILENAME)
     with open(DB_FILENAME, 'r+') as json_file:
         data = json.load(json_file)
@@ -75,11 +80,13 @@ async def on_guild_join(guild):
                 data["servers"][str(guild.id)]["privileged_roles"].append(role.id)
                 validRole = role
                 break
-        if validRole:
-            await guild.text_channels[0].send(guild.owner.mention+" "+role.mention+" Bonjour, je viens d'arriver sur le serveur. Avant de pouvoir whitelister les membres de ce serveur, je devrai être configuré. Le rôle mentionné a été automatiquement ajouté aux rôles permettant d'exécuter les commandes administratives du bot, ainsi que whitelister les membres. Utilisez la commande _!addPrivileged_ ou _!removePrivileged_ pour ajouter ou supprimer des rôles de la liste des rôles privilégiés. Pour vous renseigner d'avantage sur ma configuration, exécutez la commande _!config_")
-        else:
-            await guild.text_channels[0].send(guild.owner.mention+" Bonjour, je viens d'arriver sur le serveur. Avant de pouvoir whitelister les membres de ce serveur, je devrai être configuré. Utilisez la commande _!addPrivileged_ ou _!removePrivileged_ pour ajouter ou supprimer des rôles de la liste des rôles privilégiés, ceux-ci pourront configurer le bot et ajouter ou supprimer des utilisateurs de la whitelist. Pour vous renseigner d'avantage sur ma configuration, exécutez la commande _!config_")
-                #ping the owner
+        for channel in guild.text_channels:
+            if channel.permissions_for(guild.me).send_messages:
+                if validRole:
+                    await channel.send(guild.owner.mention+" "+role.mention+" Bonjour, je viens d'arriver sur le serveur. Avant de pouvoir whitelister les membres de ce serveur, je devrai être configuré. Le rôle mentionné a été automatiquement ajouté aux rôles permettant d'exécuter les commandes administratives du bot, ainsi que whitelister les membres. Utilisez la commande _!addPrivileged_ ou _!removePrivileged_ pour ajouter ou supprimer des rôles de la liste des rôles privilégiés. Pour vous renseigner d'avantage sur ma configuration, exécutez la commande _!config_")
+                else:
+                    await channel.send(guild.owner.mention+" Bonjour, je viens d'arriver sur le serveur. Avant de pouvoir whitelister les membres de ce serveur, je devrai être configuré. Utilisez la commande _!addPrivileged_ ou _!removePrivileged_ pour ajouter ou supprimer des rôles de la liste des rôles privilégiés, ceux-ci pourront configurer le bot et ajouter ou supprimer des utilisateurs de la whitelist. Pour vous renseigner d'avantage sur ma configuration, exécutez la commande _!config_")
+                break
         writeJSON(data, json_file)
     placeDB(DB_FILENAME)
 
@@ -320,6 +327,13 @@ async def on_message(message):
 ########---------
 #COMMANDS
 ########---------
+
+@bot.command(pass_context=True)
+async def perms(ctx):
+    if DEBUG and not isMessageFromDM(ctx) and guildHasThisPrefix(ctx.guild.id, ctx.prefix) and hasPerms(ctx):
+        for channel in ctx.guild.text_channels:
+            print("channel perms: "+pp.pformat(channel.permissions_for(ctx.guild.me)))
+            print("send_messages: "+pp.pformat(channel.permissions_for(ctx.guild.me).send_messages))
 
 #[Used for debugging] Command that logs the bot out
 @bot.command(name="s")
