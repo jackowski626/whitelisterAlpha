@@ -8,6 +8,7 @@ import os
 import http.client
 import random
 import paramiko
+import logging
 from fixedMcuuidAPI import GetPlayerData
 
 #There are situations in which functions which require a ctx object are needed but no ctx is present. In that case, a "fake" ctx is created and passed as argument instead
@@ -51,7 +52,7 @@ def grabUuids(name, guild_id):
         if minecraftFTP[detail] == "none":
             noneCredentialsList.append(detail)
     if len(noneCredentialsList) > 0:
-        return ["missingCredentials", noneCredentialsList]
+        return ("missingCredentials", noneCredentialsList)
     if DEBUG: print("Connecting to ftp with:",minecraftFTP["user"],minecraftFTP["password"],minecraftFTP["path"])
     if minecraftFTP["mode"] == "ftp":
         ftp = FTP(minecraftFTP["host"])
@@ -63,20 +64,37 @@ def grabUuids(name, guild_id):
             ftp.retrbinary('RETR ' + filename, localfile.write, 1024)
             ftp.quit()
             localfile.close()
-            return ["ok"]
+            return ("ok", None)
         except ftplib.error_perm:
-            return ["error"]
+            return ("error", None)
     elif minecraftFTP["mode"] == "sftp":
-        host, port = minecraftFTP["host"], minecraftFTP["port"]
-        transport = paramiko.Transport((host,port))
-        sftp = paramiko.SFTPClient.from_transport(transport)
-        filepath = ""
-        if minecraftFTP["path"][-1] == "/":
-            filepath = minecraftFTP["path"]+WHITELIST_FILENAME
-        else:
-            filepath = minecraftFTP["path"]+"/"+WHITELIST_FILENAME
-        localpath = "./"+WHITELIST_FILENAME
-        sftp.get(filepath, localpath)
+        paramiko.util.log_to_file("paramiko.log")
+        host, port = minecraftFTP["host"], int(minecraftFTP["port"])
+        if DEBUG: print("stfp host and port:", host, port)
+        try:
+            transport = paramiko.Transport((host,port))
+            username,password = minecraftFTP["user"], minecraftFTP["password"]
+            transport.connect(None,username,password)
+            sftp = paramiko.SFTPClient.from_transport(transport)
+            filepath = ""
+            if minecraftFTP["path"][-1] == "/":
+                if minecraftFTP["path"][0] == "/":
+                    filepath = minecraftFTP["path"]+name
+                else:
+                    filepath = "/"+minecraftFTP["path"]+name
+            else:
+                if minecraftFTP["path"][0] == "/":
+                    filepath = minecraftFTP["path"]+"/"+name
+                else:
+                    filepath = "/"+minecraftFTP["path"]+"/"+name
+            localpath = "./"+name
+            sftp.get(filepath, localpath)
+            if sftp: sftp.close()
+            if transport: transport.close()
+            return ("ok", None)
+        except:
+            if DEBUG: logging.exception('')
+            return ("error", None)
 
 #Function that sends the whitelist JSON file to a remote FTP location. Ii uses configurable credentials and connects to an FTP server with Minecraft server files, usually
 def placeUuids(name, guild_id):
@@ -99,17 +117,28 @@ def placeUuids(name, guild_id):
                 data = json.load(json_file)
                 bot.get_channel(data["servers"][str(guild_id)]).send("Erreur de permissions FTP. Les identifiants FTP du serveur Minecraft sont probablement non-valides.")
     elif minecraftFTP["mode"] == "sftp":
-        host, port = minecraftFTP["host"], minecraftFTP["port"]
-        transport = paramiko.Transport((host,port))
-        sftp = paramiko.SFTPClient.from_transport(transport)
-        filepath = ""
-        if minecraftFTP["path"][-1] == "/":
-            filepath = minecraftFTP["path"]+WHITELIST_FILENAME
-        else:
-            filepath = minecraftFTP["path"]+"/"+WHITELIST_FILENAME
-        localpath = "./"+WHITELIST_FILENAME
-        sftp.get(localpath, filepath)
-
+        paramiko.util.log_to_file("paramiko.log")
+        host, port = minecraftFTP["host"], int(minecraftFTP["port"])
+        try:
+            transport = paramiko.Transport((host,port))
+            username,password = minecraftFTP["user"], minecraftFTP["password"]
+            transport.connect(None,username,password)
+            sftp = paramiko.SFTPClient.from_transport(transport)
+            filepath = ""
+            if minecraftFTP["path"][-1] == "/":
+                if minecraftFTP["path"][0] == "/":
+                    filepath = "."+minecraftFTP["path"]+name
+                else:
+                    filepath = "./"+minecraftFTP["path"]+name
+            else:
+                if minecraftFTP["path"][0] == "/":
+                    filepath = "."+minecraftFTP["path"]+"/"+name
+                else:
+                    filepath = "./"+minecraftFTP["path"]+"/"+name
+            localpath = "./"+name
+            sftp.put(localpath, filepath)
+        except:
+            if DEBUG: logging.exception('')
 #Function that writes from variable to file on the disk. It is called writeJSON because for now, each use of it writes to a JSON file.
 def writeJSON(data, json_file):
     if DEBUG: print("writingJSON("+pp.pformat(data)+", "+pp.pformat(json_file)+")")
@@ -119,7 +148,10 @@ def writeJSON(data, json_file):
 
 #The GetPlayerData function returns uuids without hyphens. The whitelist.json that a Minecraft server uses, however, needs it to have hyphens at specific places and addHyphensToPlayer adds them
 def addHyphensToPlayer(player):
-    player.uuid = player.uuid[0:8]+"-"+player.uuid[8:12]+"-"+player.uuid[12:16]+"-"+player.uuid[16:20]+"-"+player.uuid[20:32]
+    try:
+        player.uuid = player.uuid[0:8]+"-"+player.uuid[8:12]+"-"+player.uuid[12:16]+"-"+player.uuid[16:20]+"-"+player.uuid[20:32]
+    except:
+        if DEBUG: logging.exception('')
     return player
 
 #Function that returns T/F depending if the user that issued the ctx has a role that is in the list of roles with privileges. In the JSON file, this entry is "privileged_roles"
@@ -159,12 +191,14 @@ def guildHasThisPrefix(guild_id, prefix):
 
 #WIP #Function that checks if the user does not have a pending response to the bot (for example issued the host command but didn't respond to the bot)
 waitingResponsesDict = {"usersWaitingForNicknameConfirmation":"nom d'utilisateur Minecraft", "usersWaitingForFtpModeConfirmation":"mode ftp ou sftp","usersWaitingForFtpHostConfirmation":"hôte FTP","usersWaitingForFtpUserConfirmation":"nom d'utilisateur FTP","usersWaitingForFtpPasswordConfirmation":"mot de passe FTP","usersWaitingForFtpPathConfirmation":"chemin d'accès au fichier whitelist.json"}
-def hasPendingResponses(user_id):
+def hasPendingResponses(user_id, bot):
     grabDB(DB_FILENAME)
     with open(DB_FILENAME) as json_file:
         data = json.load(json_file)
         for server in data["servers"]:
             for key in waitingResponsesDict:
+                if key == "usersWaitingForNicknameConfirmation" and user_id in data["servers"][server]["hasRespondedWithValidUname"]:
+                    return False
                 if user_id in data["servers"][server][key]:
                     print("the user has pending stuff",waitingResponsesDict[key], bot.get_guild(int(server)).name)
                     return (waitingResponsesDict[key], bot.get_guild(int(server)).name)

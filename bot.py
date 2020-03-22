@@ -23,6 +23,7 @@ from functions import *
 ##REFUSED_ASK_COMMAND_MESSAGE: If the user issues a !ask command while an ASK_MESSAGE is already present, the bot refuses to repost it. If the user issues !askOverride, the bot deletes all his refusal messages and the original !ask command. This is one of the messages he has to delete.
 ##REFUSED_ASK_COMMAND_CHANNEL: Related to REFUSED_ASK_COMMAND_ID
 ##REFUSED_BOT_ASK_COMMAND_MESSAGE: Related to REFUSED_ASK_COMMAND_ID
+##Current channel: channel from which something, like a command, has been issued from
 #----------------------------------------------------
 
 
@@ -66,7 +67,7 @@ async def on_guild_join(guild):
     with open(DB_FILENAME, 'r+') as json_file:
         data = json.load(json_file)
         #Add a new server entry to the json
-        data["servers"][str(guild.id)] = {"server_id":guild.id,"prefix":DEFAULT_PREFIX,"hasPosted":"False","ASK_CHANNEL":"none","WAITING_CHANNEL":"none","ASK_MESSAGE":"none","REFUSED_ASK_COMMAND_CHANNEL":"none","REFUSED_ASK_COMMAND_MESSAGE":"none","REFUSED_BOT_ASK_COMMAND_MESSAGE":"none","privileged_roles":[],"usersWaitingForFtpHostConfirmation":[],"usersWaitingForFtpUserConfirmation":[],"usersWaitingForFtpPasswordConfirmation":[],"usersWaitingForFtpPathConfirmation":[],"usersWaitingForFtpPortConfirmation": [],"minecraftFTP":{"mode":"none","host":"none","user":"none","password":"none","path":"none","port":21},"usersWaitingForNicknameConfirmation":[],"hasRespondedWithValidUname":[],"hasRespondedWithValidUnameDict":{},"whitelistedUsers":[],"discordToMCdict":{}}
+        data["servers"][str(guild.id)] = {"server_id":guild.id,"prefix":DEFAULT_PREFIX,"hasPosted":"False","ASK_CHANNEL":"none","WAITING_CHANNEL":"none","ASK_MESSAGE":"none","REFUSED_ASK_COMMAND_CHANNEL":"none","REFUSED_ASK_COMMAND_MESSAGE":"none","REFUSED_BOT_ASK_COMMAND_MESSAGE":"none","privileged_roles":[],"usersWaitingForFtpModeConfirmation": [],"usersWaitingForFtpHostConfirmation":[],"usersWaitingForFtpUserConfirmation":[],"usersWaitingForFtpPasswordConfirmation":[],"usersWaitingForFtpPathConfirmation":[],"usersWaitingForFtpPortConfirmation": [],"minecraftFTP":{"mode":"none","host":"none","user":"none","password":"none","path":"none","port":21},"usersWaitingForNicknameConfirmation":[],"hasRespondedWithValidUname":[],"hasRespondedWithValidUnameDict":{},"whitelistedUsers":[],"discordToMCdict":{}}
         #Send message which pings a role with admin privileges and says that the bot should be configured
         validRole = None
         for role in guild.roles:
@@ -143,7 +144,7 @@ async def on_raw_reaction_add(reaction):
                         with open(DB_FILENAME, 'r+') as json_file:
                             data = json.load(json_file)
                             data["servers"][server]["usersWaitingForNicknameConfirmation"].remove(user.id)
-                            data["servers"][server]["hasRespondedWithValidUname"].remove(fullUsername)
+                            data["servers"][server]["hasRespondedWithValidUname"].remove(user.id)
                             del data["servers"][server]["hasRespondedWithValidUnameDict"][fullUsername]
                             writeJSON(data, json_file)
                         placeDB(DB_FILENAME)
@@ -164,7 +165,7 @@ async def on_raw_reaction_add(reaction):
                                 with open(DB_FILENAME, 'r+') as json_file:
                                     data = json.load(json_file)
                                     data["servers"][server]["usersWaitingForNicknameConfirmation"].remove(tempUser.id)
-                                    data["servers"][server]["hasRespondedWithValidUname"].remove(uname)
+                                    data["servers"][server]["hasRespondedWithValidUname"].remove(tempUser.id)
                                     del data["servers"][server]["hasRespondedWithValidUnameDict"][uname]
                                     writeJSON(data, json_file)
                                 placeDB(DB_FILENAME)
@@ -201,7 +202,7 @@ async def on_raw_reaction_add(reaction):
                                     with open(DB_FILENAME, 'r+') as json_file:
                                         data = json.load(json_file)
                                         data["servers"][server]["usersWaitingForNicknameConfirmation"].remove(tempUser.id)
-                                        data["servers"][server]["hasRespondedWithValidUname"].remove(uname)
+                                        data["servers"][server]["hasRespondedWithValidUname"].remove(tempUser.id)
                                         data["servers"][server]["whitelistedUsers"].append(uname)
                                         del data["servers"][server]["hasRespondedWithValidUnameDict"][uname]
                                         data["servers"][server]["discordToMCdict"][userid] = {"DiscordTag":uname,"username":ingameName,"uuid":uuid}
@@ -244,13 +245,13 @@ async def on_message(message):
         with open(DB_FILENAME) as json_file:
             data = json.load(json_file)
             for server in data["servers"]:
-                if message.author.id in data["servers"][server]["usersWaitingForNicknameConfirmation"] and fullUsername not in data["servers"][server]["hasRespondedWithValidUname"]:
+                if message.author.id in data["servers"][server]["usersWaitingForNicknameConfirmation"] and message.author.id not in data["servers"][server]["hasRespondedWithValidUname"]:
                     #Check if username is registered at Mojang
                     player = addHyphensToPlayer(GetPlayerData(message.content))
                     if player.valid is True:
                         with open(DB_FILENAME, 'r+') as json_file:
                             data = json.load(json_file)
-                            data["servers"][server]["hasRespondedWithValidUname"].append(fullUsername)
+                            data["servers"][server]["hasRespondedWithValidUname"].append(message.author.id)
                             data["servers"][server]["hasRespondedWithValidUnameDict"][fullUsername] = message.content
                             writeJSON(data, json_file)
                         placeDB(DB_FILENAME)
@@ -294,7 +295,7 @@ async def on_message(message):
                         data["servers"][server]["minecraftFTP"]["password"] = message.content
                         writeJSON(data, json_file)
                     placeDB(DB_FILENAME)
-                    await message.author.send("Le mot de passe FTP a été changé en _"+message.content[0]+"*"*len(message.content)+message.content[-1]+"_")
+                    await message.author.send("Le mot de passe FTP a été changé en _"+message.content[0]+"****"+message.content[-1]+"_")
                 elif message.author.id in data["servers"][server]["usersWaitingForFtpPathConfirmation"]:
                     with open(DB_FILENAME, 'r+') as json_file:
                         data = json.load(json_file)
@@ -359,7 +360,7 @@ async def whitelist(ctx):
 @bot.command(pass_context=True)
 async def ftp(ctx):
     if not isMessageFromDM(ctx):
-        await ctx.channel.send("Pour changer le hôte FTP pour le serveur Minecraft, le nom d'utilisateur, le mot de passe et le chemin d'accès, utilisez ces commandes respectives: _host_, _user_, _password_, _path_.\nExemple d'utilisation: ```"+ctx.prefix+"path /htdocs/whitelist_test/minecraft```")
+        await ctx.channel.send("Pour changer le mode (FTP ou SFTP) pour le serveur Minecraft, le hôte FTP, le nom d'utilisateur, le mot de passe, le chemin d'accès et le port, utilisez ces commandes respectives: _mode_, _host_, _user_, _password_, _path_, _port_.\nExemple d'utilisation: ```"+ctx.prefix+"path /htdocs/whitelist_test/minecraft```")
 
 #Command which removes tagged Discord users from Minecraft whitelist.json file
 @bot.command(pass_context=True)
@@ -413,7 +414,7 @@ async def removeFromWhitelist(ctx):
 
 @bot.command(pass_context=True)
 async def mode(ctx):
-    hasAnyPendingResponses = hasPendingResponses(ctx.author.id)
+    hasAnyPendingResponses = hasPendingResponses(ctx.author.id, bot)
     if not hasAnyPendingResponses:
         if not isMessageFromDM(ctx) and guildHasThisPrefix(ctx.guild.id, ctx.prefix) and hasPerms(ctx):
             grabDB(DB_FILENAME)
@@ -423,12 +424,12 @@ async def mode(ctx):
                     data["servers"][str(ctx.guild.id)]["usersWaitingForFtpModeConfirmation"].append(ctx.author.id)
                     writeJSON(data, json_file)
                     placeDB(DB_FILENAME)
-                    await ctx.author.send("Veuillez répondre avec le mode de connection du serveur, _ftp_ ou _sftp_"+ctx.guild.name)
+                    await ctx.author.send("Veuillez répondre avec le mode de connection du serveur, _ftp_ ou _sftp_ du serveur "+ctx.guild.name)
     else:
         await ctx.author.send("Vous devez déjà répondre avec un "+hasAnyPendingResponses[0]+" pour le serveur "+hasAnyPendingResponses[1])
 @bot.command(pass_context=True)
 async def host(ctx):
-    hasAnyPendingResponses = hasPendingResponses(ctx.author.id)
+    hasAnyPendingResponses = hasPendingResponses(ctx.author.id, bot)
     if not hasAnyPendingResponses:
         if not isMessageFromDM(ctx) and guildHasThisPrefix(ctx.guild.id, ctx.prefix) and hasPerms(ctx):
             grabDB(DB_FILENAME)
@@ -438,12 +439,12 @@ async def host(ctx):
                     data["servers"][str(ctx.guild.id)]["usersWaitingForFtpHostConfirmation"].append(ctx.author.id)
                     writeJSON(data, json_file)
                     placeDB(DB_FILENAME)
-                    await ctx.author.send("Veuillez répondre avec le nom d'hôte pour le serveur FTP Minecraft du serveur "+ctx.guild.name)
+                    await ctx.author.send("Veuillez répondre avec le nom d'hôte pour le serveur FTP Minecraft du serveur "+ctx.guild.name+". Ne pas inclure le préfixe comme ftp:// ou sftp://")
     else:
         await ctx.author.send("Vous devez déjà répondre avec un "+hasAnyPendingResponses[0]+" pour le serveur "+hasAnyPendingResponses[1])
 @bot.command(pass_context=True)
 async def user(ctx):
-    hasAnyPendingResponses = hasPendingResponses(ctx.author.id)
+    hasAnyPendingResponses = hasPendingResponses(ctx.author.id, bot)
     if not hasAnyPendingResponses:
         if not isMessageFromDM(ctx) and guildHasThisPrefix(ctx.guild.id, ctx.prefix) and hasPerms(ctx):
             grabDB(DB_FILENAME)
@@ -458,7 +459,7 @@ async def user(ctx):
         await ctx.author.send("Vous devez déjà répondre avec un "+hasAnyPendingResponses[0]+" pour le serveur "+hasAnyPendingResponses[1])
 @bot.command(pass_context=True)
 async def password(ctx):
-    hasAnyPendingResponses = hasPendingResponses(ctx.author.id)
+    hasAnyPendingResponses = hasPendingResponses(ctx.author.id, bot)
     if not hasAnyPendingResponses:
         if not isMessageFromDM(ctx) and guildHasThisPrefix(ctx.guild.id, ctx.prefix) and hasPerms(ctx):
             grabDB(DB_FILENAME)
@@ -473,14 +474,14 @@ async def password(ctx):
         await ctx.author.send("Vous devez déjà répondre avec un "+hasAnyPendingResponses[0]+" pour le serveur "+hasAnyPendingResponses[1])
 @bot.command(pass_context=True)
 async def path(ctx):
-    hasAnyPendingResponses = hasPendingResponses(ctx.author.id)
+    hasAnyPendingResponses = hasPendingResponses(ctx.author.id, bot)
     if not hasAnyPendingResponses:
         if not isMessageFromDM(ctx) and guildHasThisPrefix(ctx.guild.id, ctx.prefix) and hasPerms(ctx):
             grabDB(DB_FILENAME)
             with open(DB_FILENAME, 'r+') as json_file:
                 data = json.load(json_file)
-                if ctx.author.id not in data["servers"][str(ctx.guild.id)]["usersWaitingForFtpPasswordConfirmation"]:
-                    data["servers"][str(ctx.guild.id)]["usersWaitingForFtpPasswordConfirmation"].append(ctx.author.id)
+                if ctx.author.id not in data["servers"][str(ctx.guild.id)]["usersWaitingForFtpPathConfirmation"]:
+                    data["servers"][str(ctx.guild.id)]["usersWaitingForFtpPathConfirmation"].append(ctx.author.id)
                     writeJSON(data, json_file)
                     placeDB(DB_FILENAME)
                     await ctx.author.send("Veuillez répondre avec le chemin d'accès vers le fichier whitelist.json pour le serveur FTP Minecraft du serveur "+ctx.guild.name+". Si la whitelist est dans le root, répondez avec _/_")
@@ -488,7 +489,7 @@ async def path(ctx):
         await ctx.author.send("Vous devez déjà répondre avec un "+hasAnyPendingResponses[0]+" pour le serveur "+hasAnyPendingResponses[1])
 @bot.command(pass_context=True)
 async def port(ctx):
-    hasAnyPendingResponses = hasPendingResponses(ctx.author.id)
+    hasAnyPendingResponses = hasPendingResponses(ctx.author.id, bot)
     if not hasAnyPendingResponses:
         if not isMessageFromDM(ctx) and guildHasThisPrefix(ctx.guild.id, ctx.prefix) and hasPerms(ctx):
             grabDB(DB_FILENAME)
@@ -539,6 +540,12 @@ async def info_error(ctx, error):
     if isinstance(error, commands.errors.MissingRequiredArgument):
         pass
 
+#Command that makes the bot send information about its setup to the current channel
+@bot.command(pass_context=True)
+async def config(ctx):
+        if not isMessageFromDM(ctx) and guildHasThisPrefix(ctx.guild.id, ctx.prefix) and hasPerms(ctx):
+            await ctx.channel.send("Voici quelques informations sur ma configuration:\n#Il est recommandé d'utiliser la commande _addPrivileged_ pour laisser un éventuel technicien me configurer\n#Utilisez la commande _ftp_ pour entrer les détails du compte FTP Minecraft. Ces détails sont enregistrés en texte lisible, si vous ne faites pas confiance au bot, ne l'utilisez pas. Sans ces détails, le bot ne peut pas fonctionner\n#Après avoir configuré l'accès FTP du bot, crééz un channel (restreint aux administrateurs, de préférence) où les utilisateurs pourront réagir au message du bot pour faire une requête de whitelist. Dans ce channel exécutez la commande _ask_.\n#Crééz ensuite un nouveau channel (restreint aussi, si possible) dans lequel je vais poster les demandes de whitelist des utilisateurs. Dans ce channel exécutez la commande _waiting_\n#Pour le restant des commandes, utiisez la commande _help_. Je peux faire quelques fonctions utiles liéés à la whitelist de votre serveur Minecraft, comme par exemple lister les joueurs dans la playlist ou en supprimer d'elle")
+
 #[Used for debugging] Command that resets the "hasPosted" field for each server to False
 @bot.command()
 async def resetAskJson(ctx):
@@ -566,7 +573,7 @@ async def ask(ctx):
                 data["servers"][str(ctx.guild.id)]["REFUSED_BOT_ASK_COMMAND_MESSAGE"] = msg_de_refus.id
             else:
                 data["servers"][str(ctx.guild.id)]["hasPosted"] = "True"
-                data["servers"][str(ctx.guild.id)]["ASK_MESSAGE"] = ctx.message.id   
+                data["servers"][str(ctx.guild.id)]["ASK_CHANNEL"] = ctx.channel.id 
                 await ctx.message.delete()
                 msg = await ctx.channel.send("Pour faire une demande de whitelist sur le serveur, réagis avec :white_check_mark:")
                 data["servers"][str(ctx.guild.id)]["ASK_MESSAGE"] = msg.id
@@ -598,10 +605,24 @@ async def askOverride(ctx):
             await ctx.message.delete()
             msg = await ctx.channel.send("Pour faire une demande de whitelist sur le serveur, réagis avec :white_check_mark:")
             data["servers"][str(ctx.guild.id)]["ASK_MESSAGE"] = msg.id
+            data["servers"][str(ctx.guild.id)]["ASK_CHANNEL"] = ctx.channel.id
             writeJSON(data, json_file)
             await msg.add_reaction("✅")
         placeDB(DB_FILENAME)
-                    
+
+#Command to set the id of the WAITING_CHANNEL
+@bot.command()
+async def waiting(ctx):
+    if not isMessageFromDM(ctx) and guildHasThisPrefix(ctx.guild.id, ctx.prefix) and hasPerms(ctx):
+        grabDB(DB_FILENAME)
+        with open(DB_FILENAME, 'r+') as json_file:
+            data = json.load(json_file)   
+            await ctx.message.delete()
+            await ctx.channel.send("Les requêtes de whitelist apparaîssent dans ce channel")
+            data["servers"][str(ctx.guild.id)]["WAITING_CHANNEL"] = ctx.channel.id
+            writeJSON(data, json_file)
+        placeDB(DB_FILENAME)
+
 #[Used for debugging] Command that makes the bot send "hello" in current channel and prints info in the logs
 @bot.command(pass_context=True)
 async def say(ctx):
